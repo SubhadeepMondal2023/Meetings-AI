@@ -4,7 +4,6 @@ import { processMeetingTranscript, generateRiskAnalysis, generateSentimentArc, g
 import { addToKnowledgeGraph } from "@/lib/graph";
 import { prisma } from "@/lib/db";
 import { processTranscript } from "@/lib/rag";
-import { sendMeetingSummaryEmail } from "@/lib/email-service-free";
 
 // This function processes the heavy job
 async function handler(req: NextRequest) {
@@ -25,21 +24,16 @@ async function handler(req: NextRequest) {
         if (!meeting) return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
 
         // 1. Generate Summary & Action Items
-        const processed = await processMeetingTranscript(transcript);
-
-        // 2. Send Email
-        await sendMeetingSummaryEmail({
-            // ✅ FIX 2: Change 'meeting.user' to 'meeting.createdBy'
-            userEmail: meeting.createdBy.email!,
-            userName: meeting.createdBy.name || 'User',
-            meetingTitle: meeting.title,
-            summary: processed.summary,
-            actionItems: processed.actionItems,
-            meetingId: meeting.id,
-            meetingDate: meeting.startTime.toLocaleDateString()
+        console.log("📋 Transcript structure:", {
+            type: typeof transcript,
+            isArray: Array.isArray(transcript),
+            firstItem: Array.isArray(transcript) ? transcript[0] : null,
+            sampleLength: JSON.stringify(transcript).length
         });
+        
+        const processed = await processMeetingTranscript(transcript);;
 
-        // 3. Update DB with Summary
+        // Update DB with Summary
         await prisma.meeting.update({
             where: { id: meetingId },
             data: {

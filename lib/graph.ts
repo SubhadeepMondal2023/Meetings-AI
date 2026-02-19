@@ -50,7 +50,12 @@ export async function addToKnowledgeGraph(transcript: any, meetingId: string, me
     let textContent = "";
     if (Array.isArray(transcript)) {
       textContent = transcript
-        .map((t: any) => `${t.speaker}: ${t.words.map((w: any) => w.word).join(" ")}`)
+        .map((t: any) => {
+          const text = t.words && t.words.length > 0
+            ? t.words.map((w: any) => w.word).join(" ")
+            : t.text || "[speaking]";
+          return `${t.speaker}: ${text}`;
+        })
         .join("\n");
     } else if (typeof transcript === "string") {
       textContent = transcript;

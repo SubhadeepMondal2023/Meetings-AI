@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2024-06-20',
+    apiVersion: '2025-08-27.basil',
     typescript: true,
 })
 
@@ -145,7 +145,7 @@ async function handleSubscriptionCancelled(subscription: Stripe.Subscription) {
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     try {
-        const subscriptionId = (invoice as any).subscription as string | null
+        const subscriptionId = (invoice as Stripe.Invoice & { subscription?: string }).subscription as string | null
 
         console.log(`💰 Payment Succeeded - Subscription: ${subscriptionId}`);
 

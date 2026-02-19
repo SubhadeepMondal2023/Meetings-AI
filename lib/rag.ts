@@ -96,18 +96,18 @@ export async function chatWithAllMeetings(
     userId: string,
     question: string
 ) {
-    // 1. Parallel Execution: Run Vector Search AND Graph Search at the same time
-    const [questionEmbedding, graphKnowledge] = await Promise.all([
-        createEmbedding(question),
-        queryGraphMemory(question) // Query Neo4j
-    ]);
+    // 1. Create embedding first
+    const questionEmbedding = await createEmbedding(question)
 
-    // 2. Vector Search Results (Unstructured Text)
-    const vectorResults = await searchVectors(
-        questionEmbedding,
-        { userId },
-        8
-    )
+    // 2. Now run Pinecone AND Neo4j searches in parallel (they don't depend on each other)
+    const [vectorResults, graphKnowledge] = await Promise.all([
+        searchVectors(
+            questionEmbedding,
+            { userId },
+            8
+        ),
+        queryGraphMemory(question) // Query Neo4j in parallel
+    ]);
 
     const vectorContext = vectorResults
         .map(result => {

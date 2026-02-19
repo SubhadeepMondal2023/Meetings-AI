@@ -16,10 +16,12 @@ export async function processMeetingTranscript(transcript: any) {
     if (Array.isArray(transcript)) {
       transcriptText = transcript
         .map(
-          (item: any) =>
-            `${item.speaker || "Speaker"}: ${item.words
-              .map((w: any) => w.word)
-              .join(" ")}`
+          (item: any) => {
+            const text = item.words && item.words.length > 0
+              ? item.words.map((w: any) => w.word).join(" ")
+              : item.text || "[speaking]";
+            return `${item.speaker || "Speaker"}: ${text}`;
+          }
         )
         .join("\n");
     } else if (typeof transcript === "string") {
@@ -106,10 +108,12 @@ export async function generateRiskAnalysis(
     if (Array.isArray(transcript)) {
       transcriptText = transcript
         .map(
-          (item: any) =>
-            `${item.speaker || "Speaker"}: ${item.words
-              .map((w: any) => w.word)
-              .join(" ")}`
+          (item: any) => {
+            const text = item.words && item.words.length > 0
+              ? item.words.map((w: any) => w.word).join(" ")
+              : item.text || "[speaking]";
+            return `${item.speaker || "Speaker"}: ${text}`;
+          }
         )
         .join("\n");
     } else if (typeof transcript === "string") {
@@ -174,9 +178,24 @@ export async function generateSentimentArc(transcript: any, meetingId: string) {
     // 1. Determine Meeting Duration & Window Size
     // We'll analyze in 30-second chunks for high resolution
     const lastSegment = transcript[transcript.length - 1];
-    const duration = lastSegment?.words
-      ? lastSegment.words[lastSegment.words.length - 1].end_time
-      : 0;
+    
+    // Handle case where words array is empty
+    let duration = 0;
+    if (lastSegment?.words && lastSegment.words.length > 0) {
+      duration = lastSegment.words[lastSegment.words.length - 1].end || 0;
+    } else if (lastSegment?.end_time) {
+      // Fallback to end_time if words are empty
+      duration = lastSegment.end_time;
+    } else if (lastSegment?.end) {
+      duration = lastSegment.end;
+    }
+
+    // If no duration found, skip sentiment analysis
+    if (duration === 0) {
+      console.warn("⚠️ Could not determine meeting duration. Sentiment analysis skipped.");
+      return null;
+    }
+
     const windowSize = 30;
     const windows = [];
 
@@ -186,7 +205,7 @@ export async function generateSentimentArc(transcript: any, meetingId: string) {
 
       // Get all words spoken in this timeframe
       const segmentsInWindow = transcript.filter((item: any) => {
-        const start = item.words[0]?.start_time || 0;
+        const start = item.words?.[0]?.start || item.offset || 0;
         return start >= t && start < windowEnd;
       });
 
@@ -194,10 +213,13 @@ export async function generateSentimentArc(transcript: any, meetingId: string) {
       if (segmentsInWindow.length === 0) continue;
 
       // Format: "SpeakerName: Text..."
+      // Handle case where words array might be empty
       const textPayload = segmentsInWindow
         .map(
-          (s: any) =>
-            `${s.speaker}: ${s.words.map((w: any) => w.word).join(" ")}`
+          (s: any) => {
+            const text = s.words?.map((w: any) => w.word).join(" ") || s.text || "";
+            return text ? `${s.speaker}: ${text}` : `${s.speaker}: [speaking]`;
+          }
         )
         .join("\n");
 
