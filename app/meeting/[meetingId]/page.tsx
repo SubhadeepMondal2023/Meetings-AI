@@ -129,12 +129,12 @@ function MeetingDetail() {
                                                 </div>
                                             )}
 
-                                            {/* 2. 🔥 The Devil's Advocate Analysis */}
+                                            {/* 2. Risk Analysis */}
                                             {(meetingData as any).riskAnalysis && (
                                                 <div className="border-l-4 border-red-500 bg-red-50 dark:bg-red-950/10 p-6 rounded-r-lg shadow-sm">
                                                     <div className="flex items-center gap-2 mb-4">
                                                         <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                                                        <h2 className="text-xl font-bold text-red-600 dark:text-red-400">The Devil's Advocate Analysis</h2>
+                                                        <h2 className="text-xl font-bold text-red-600 dark:text-red-400">Risk Analysis</h2>
                                                     </div>
                                                     
                                                     <div 
@@ -151,7 +151,7 @@ function MeetingDetail() {
                                                 </div>
                                             )}
 
-                                            {/* 3. 📈 Advanced Sentiment Arc (Multi-Speaker) */}
+                                            {/* 3.  Advanced Sentiment Arc (Multi-Speaker) */}
                                             {(meetingData as any).sentimentData && (meetingData as any).sentimentData.length > 0 && (
                                                 <div className="bg-card border border-border rounded-lg p-6">
                                                     <div className="flex items-center gap-2 mb-6">

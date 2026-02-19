@@ -12,6 +12,9 @@ async function handler(req: NextRequest) {
     const body = await req.json();
     const { meetingId, transcript, botId } = body;
 
+    // Log transcript info for debugging
+    console.log("📝 Received transcript type:", typeof transcript, "Is null:", transcript === null, "Is undefined:", transcript === undefined);
+
     try {
         const meeting = await prisma.meeting.findUnique({
             where: { id: meetingId },

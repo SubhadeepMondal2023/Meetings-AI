@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2025-08-27.basil'
+    apiVersion: '2024-06-20',
+    typescript: true,
 })
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
@@ -54,27 +55,41 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
         const customerId = subscription.customer as string
         const planName = getPlanFromSubscription(subscription)
 
+        console.log(`💳 Subscription Created - Customer: ${customerId}, Plan: ${planName}`);
+
+        if (planName === 'invalid') {
+            console.error('❌ Unknown price ID:', subscription.items.data[0]?.price.id);
+            return;
+        }
+
         const user = await prisma.user.findFirst({
             where: {
                 stripeCustomerId: customerId
             }
         })
 
-        if (user) {
-            await prisma.user.update({
-                where: {
-                    id: user.id
-                },
-                data: {
-                    currentPlan: planName,
-                    subscriptionStatus: 'active',
-                    stripeSubscriptionId: subscription.id,
-                    billingPeriodStart: new Date(),
-                    meetingsThisMonth: 0,
-                    chatMessagesToday: 0
-                }
-            })
+        if (!user) {
+            console.error(`❌ User not found for customer: ${customerId}`);
+            return;
         }
+
+        console.log(`✅ Updating user ${user.id} to plan: ${planName}`);
+
+        await prisma.user.update({
+            where: {
+                id: user.id
+            },
+            data: {
+                currentPlan: planName,
+                subscriptionStatus: 'active',
+                stripeSubscriptionId: subscription.id,
+                billingPeriodStart: new Date(),
+                meetingsThisMonth: 0,
+                chatMessagesToday: 0
+            }
+        })
+
+        console.log(`✅ Subscription activated for ${user.id}: ${planName}`);
     } catch (error) {
         console.error('error handling subscription create:', error)
     }
@@ -132,6 +147,8 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     try {
         const subscriptionId = (invoice as any).subscription as string | null
 
+        console.log(`💰 Payment Succeeded - Subscription: ${subscriptionId}`);
+
         if (subscriptionId) {
             const user = await prisma.user.findFirst({
                 where: {
@@ -139,21 +156,31 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
                 }
             })
 
-            if (user) {
-                await prisma.user.update({
-                    where: {
-                        id: user.id
-                    },
-                    data: {
-                        subscriptionStatus: 'active',
-                        billingPeriodStart: new Date(),
-                        meetingsThisMonth: 0
-                    }
-                })
+            if (!user) {
+                console.error(`❌ User not found for subscription: ${subscriptionId}`);
+                return;
             }
+
+            console.log(`✅ Activating subscription for user ${user.id}`);
+
+            await prisma.user.update({
+                where: {
+                    id: user.id
+                },
+                data: {
+                    subscriptionStatus: 'active',
+                    billingPeriodStart: new Date(),
+                    meetingsThisMonth: 0,
+                    chatMessagesToday: 0
+                }
+            })
+
+            console.log(`✅ Payment processed for user ${user.id}`);
+        } else {
+            console.warn(`⚠️ Payment succeeded but no subscription ID found in invoice`);
         }
     } catch (error) {
-        console.error('error handling payment suucession:', error)
+        console.error('error handling payment success:', error)
     }
 }
 
@@ -162,12 +189,24 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
 function getPlanFromSubscription(subscription: Stripe.Subscription) {
     const priceId = subscription.items.data[0]?.price.id
+    const metadata = subscription.metadata as Record<string, string> || {}
 
     const priceToPlank: Record<string, string> = {
-        'price_1SWjV6SWzzLnK0uGK51aS6xD': 'starter',
-        'price_1SWjVYSWzzLnK0uGd5Rs6GON': 'pro',
-        'price_1SWjVuSWzzLnK0uGFv10vELa': 'premium'
+        'price_1T1R6RPZTA6eUT52JBGYgKDr': 'starter',
+        'price_1T1R6cPZTA6eUT52sTegh3Yq': 'pro',
+        'price_1T1R6kPZTA6eUT52seIHXZXg': 'premium'
     }
 
-    return priceToPlank[priceId] || 'invalid'
+    // Try to get from price ID first
+    if (priceId && priceToPlank[priceId]) {
+        return priceToPlank[priceId]
+    }
+
+    // Fallback to metadata if price ID doesn't match
+    if (metadata.planName && ['starter', 'pro', 'premium'].includes(metadata.planName)) {
+        console.warn(`⚠️ Using metadata fallback for planName: ${metadata.planName}`);
+        return metadata.planName
+    }
+
+    return 'invalid'
 }

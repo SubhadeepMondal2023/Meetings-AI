@@ -44,12 +44,27 @@ export async function POST(request: NextRequest) {
             // Update Database
             await incrementMeetingUsage(meeting.createdById);
             
+            // Parse transcript if it's a JSON string
+            let parsedTranscript = meeting.transcript;
+            if (webhookData.transcript) {
+                try {
+                    parsedTranscript = typeof webhookData.transcript === 'string' 
+                        ? JSON.parse(webhookData.transcript) 
+                        : webhookData.transcript;
+                } catch (e) {
+                    console.warn("Could not parse transcript as JSON, keeping as string:", webhookData.transcript);
+                    parsedTranscript = webhookData.transcript;
+                }
+            }
+            
+            console.log("📝 Transcript type:", typeof parsedTranscript, "Is null:", parsedTranscript === null);
+            
             await prisma.meeting.update({
                 where: { id: meeting.id },
                 data: {
                     meetingEnded: true,
                     transcriptReady: true,
-                    transcript: webhookData.transcript || meeting.transcript, 
+                    transcript: parsedTranscript, 
                     recordingUrl: webhookData.mp4 || meeting.recordingUrl,
                     speakers: webhookData.speakers || meeting.speakers
                 }
@@ -58,11 +73,16 @@ export async function POST(request: NextRequest) {
             // Dispatch to QStash Queue for AI Summary
             const appUrl = process.env.NEXT_PUBLIC_APP_URI; 
             try {
+                // Fetch the updated meeting to get the transcript that was just saved
+                const updatedMeeting = await prisma.meeting.findUnique({
+                    where: { id: meeting.id }
+                });
+
                 const response = await client.publishJSON({
                     url: `${appUrl}/api/queue/process-meeting`,
                     body: {
                         meetingId: meeting.id,
-                        transcript: webhookData.transcript,
+                        transcript: updatedMeeting?.transcript,
                         botId: botId,
                         meetingTitle: meeting.title 
                     },

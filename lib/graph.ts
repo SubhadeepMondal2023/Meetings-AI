@@ -38,6 +38,12 @@ async function getGraph() {
 // ---------------------------------------------------------
 export async function addToKnowledgeGraph(transcript: any, meetingId: string, meetingTitle: string) {
   try {
+    // Handle null/undefined transcript
+    if (!transcript) {
+      console.warn("⚠️ Graph extraction skipped: No transcript provided");
+      return null;
+    }
+
     console.log("🕸️ Starting Graph Extraction...");
 
     // Convert your complex transcript object into a simple string for LangChain

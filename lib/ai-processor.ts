@@ -94,6 +94,12 @@ export async function generateRiskAnalysis(
   meetingId: string
 ) {
   try {
+    // Handle null/undefined transcript
+    if (!transcript) {
+      console.warn("⚠️ Risk analysis skipped: No transcript provided");
+      return null;
+    }
+
     let transcriptText = "";
 
     // Normalize transcript format
@@ -158,6 +164,11 @@ export async function generateRiskAnalysis(
 // ---------------------------------------------------------
 export async function generateSentimentArc(transcript: any, meetingId: string) {
   try {
+    // Handle null/undefined transcript
+    if (!transcript) {
+      console.warn("⚠️ Sentiment analysis skipped: No transcript provided");
+      return null;
+    }
     if (!Array.isArray(transcript)) return null;
 
     // 1. Determine Meeting Duration & Window Size
