@@ -94,9 +94,11 @@ export async function POST(request: NextRequest) {
             metadata: {
                 clerkUserId: userId,
                 dbUserId: dbUser.id,
-                planName
+                planName: planName
             }
         })
+
+        console.log(`✅ Checkout session created - Session ID: ${session.id}, Plan: ${planName}, Customer: ${stripeCustomerId}`);
 
         return NextResponse.json({ url: session.url })
 

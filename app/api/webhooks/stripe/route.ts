@@ -163,19 +163,22 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
             console.log(`✅ Activating subscription for user ${user.id}`);
 
+            // Only reset monthly metrics and chat messages if we're starting a new billing period
+            const billingPeriodStart = new Date();
+            
             await prisma.user.update({
                 where: {
                     id: user.id
                 },
                 data: {
                     subscriptionStatus: 'active',
-                    billingPeriodStart: new Date(),
+                    billingPeriodStart,
                     meetingsThisMonth: 0,
-                    chatMessagesToday: 0
+                    chatMessagesToday: 0  // Reset daily chat counter on each billing cycle
                 }
             })
 
-            console.log(`✅ Payment processed for user ${user.id}`);
+            console.log(`✅ Payment processed for user ${user.id} on plan: ${user.currentPlan}`);
         } else {
             console.warn(`⚠️ Payment succeeded but no subscription ID found in invoice`);
         }
