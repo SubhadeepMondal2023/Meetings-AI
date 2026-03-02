@@ -85,7 +85,7 @@ function Integrations() {
                 </div>
 
                 <div className='mt-8 bg-card rounded-lg p-6 border border-border'>
-                    <h3 className='font-semibold text-foreground mb-2'>How it wokrs </h3>
+                    <h3 className='font-semibold text-foreground mb-2'>How it works </h3>
 
                     <ol className='text-sm text-muted-foreground space-y-2'>
                         <li>1. Connect your preffered tools above</li>

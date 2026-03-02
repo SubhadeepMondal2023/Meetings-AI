@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
         const state = searchParams.get('state')
 
         const host = request.headers.get('host')
-        const isLocal = host?.includes('localhost') //maybe use NODE_ENV here?
+        const isLocal = host?.includes('localhost') 
         const protocol = isLocal ? 'http' : 'https'
         const baseUrl = `${protocol}://${host}`
 
