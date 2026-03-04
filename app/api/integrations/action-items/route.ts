@@ -4,7 +4,6 @@ import { JiraAPI } from "@/lib/integrations/jira/jira";
 import { refreshTokenIfNeeded } from "@/lib/integrations/refreshTokenIfNeeded";
 import { TrelloAPI } from "@/lib/integrations/trello/trello";
 import { auth } from "@clerk/nextjs/server";
-import { channel } from "diagnostics_channel";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {

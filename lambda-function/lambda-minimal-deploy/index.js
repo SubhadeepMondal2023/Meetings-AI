@@ -1,8 +1,8 @@
-const { PrismaClient } = require("@prisma/client")
+import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
-exports.handler = async (event) => {
+export async function handler() {
     try {
         console.log("🚀 [Scheduler] Started...")
         console.log("🕒 [Scheduler] Server Time (UTC):", new Date().toISOString())
@@ -14,13 +14,6 @@ exports.handler = async (event) => {
         // 2. Schedule Bots (Check DB for upcoming meetings, send Bot)
         console.log("🤖 [Step 2] Scheduling Bots...")
         await scheduleBotsForUpcomingMeetings()
-
-        // 3. Reset Daily Chat Limits
-        console.log("🔄 [Step 3] Checking Chat Limits...")
-        const result = await prisma.user.updateMany({
-            where: { subscriptionStatus: 'active' },
-            data: { chatMessagesToday: 0 }
-        })
 
         return {
             statusCode: 200,

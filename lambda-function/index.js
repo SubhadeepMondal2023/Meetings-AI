@@ -1,8 +1,8 @@
-const { PrismaClient } = require("@prisma/client")
+import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
-exports.handler = async (event) => {
+export async function handler() {
     try {
         console.log("🚀 [Scheduler] Started...")
         console.log("🕒 [Scheduler] Server Time (UTC):", new Date().toISOString())
@@ -274,19 +274,12 @@ async function deployBotToMeeting(meeting, user) {
     }
 }
 
-async function canUserScheduleMeeting(user) {
-    const PLAN_LIMITS = { free: { meetings: 5 }, starter: { meetings: 10 }, pro: { meetings: 30 }, premium: { meetings: -1 } }
-    const currentPlan = user.currentPlan || 'free'
-    const limits = PLAN_LIMITS[currentPlan] || PLAN_LIMITS.free
-    const usage = user.meetingsThisMonth || 0
-
-    if (user.subscriptionStatus !== 'active' && currentPlan !== 'free') return { allowed: false, reason: `Inactive Subscription` }
-    if (limits.meetings !== -1 && usage >= limits.meetings) return { allowed: false, reason: `Limit Reached` }
-    return { allowed: true }
+async function canUserScheduleMeeting() {  
+    // Always return true for unlimited access  
+    return { allowed: true }  
 }
-
 async function refreshGoogleToken(user) {
-    try {
+    
         if (!user.googleRefreshToken) return null
         const response = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -309,7 +302,7 @@ async function refreshGoogleToken(user) {
             }
         })
         return tokens.access_token
-    } catch (e) { return null }
+    
 }
 
 async function resetDailyChatUsage() {

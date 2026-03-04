@@ -16,14 +16,12 @@ export async function GET() {
             select: {
                 botName: true,
                 botImageUrl: true,
-                currentPlan: true
             }
         })
 
         return NextResponse.json({
             botName: dbUser?.botName || 'Meeting Bot',
             botImageUrl: dbUser?.botImageUrl || null,
-            plan: dbUser?.currentPlan || 'free'
         })
     } catch (error) {
         console.error('error fetching bot settings:', error)

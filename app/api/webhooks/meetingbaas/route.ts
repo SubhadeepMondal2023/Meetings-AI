@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { incrementMeetingUsage } from "@/lib/usage";
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@upstash/qstash";
 import { normalizeTranscript, validateTranscript } from "@/lib/transcript-parser";
@@ -121,9 +120,7 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'meeting not found' }, { status: 200 });
             }
 
-            // Update Database
-            await incrementMeetingUsage(meeting.createdById);
-            
+                        
             // Parse and normalize transcript
             let parsedTranscript = meeting.transcript;
             
@@ -186,9 +183,9 @@ export async function POST(request: NextRequest) {
                 data: {
                     meetingEnded: true,
                     transcriptReady: true,
-                    transcript: parsedTranscript, 
+                    transcript: parsedTranscript as any,  // ✅ Add "as any"
                     recordingUrl: webhookData.mp4 || meeting.recordingUrl,
-                    speakers: webhookData.speakers || meeting.speakers
+                    speakers: webhookData.speakers as any || meeting.speakers  // ✅ Add "as any"
                 }
             });
 

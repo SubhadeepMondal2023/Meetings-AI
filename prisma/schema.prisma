@@ -58,15 +58,6 @@ model User {
   preferredChannelId   String?
   preferredChannelName String?
 
-  // BILLING (Attached to User for now, can move to Workspace later)
-  currentPlan          String    @default("free")
-  subscriptionStatus   String    @default("inactive")
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-  billingPeriodStart   DateTime?
-  meetingsThisMonth    Int       @default(0)
-  chatMessagesToday    Int       @default(0)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -125,7 +116,7 @@ model Meeting {
   // CALENDAR SYNC
   calendarEventId String?      @unique
   isFromCalendar  Boolean      @default(false)
-  attendees       Json?
+  attendees       Json?        @db.JsonB
 
   // BOT STATUS
   botScheduled   Boolean       @default(true)
@@ -137,16 +128,16 @@ model Meeting {
   // ASSETS & AI DATA
   transcriptReady Boolean      @default(false)
   recordingUrl    String?
-  transcript      Json?
-  speakers        Json?
+  transcript      Json?        @db.JsonB
+  speakers        Json?        @db.JsonB
   
   // 🔥 ADVANCED AI FEATURES
   summary         String?      @db.Text
-  actionItems     Json?
+  actionItems     Json?        @db.JsonB
   riskAnalysis    String?      @db.Text // Devil's Advocate
-  sentimentData   Json?        // Emotional Arc (Recharts)
-  speakerProfiles Json?        // Behavioral Profiling
-  chapters        Json?        // Smart Chapters
+  sentimentData   Json?        @db.JsonB
+  speakerProfiles Json?        @db.JsonB
+  chapters        Json?        @db.JsonB
 
   // PROCESSING FLAGS
   processed       Boolean      @default(false)
