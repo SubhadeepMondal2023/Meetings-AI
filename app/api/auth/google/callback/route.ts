@@ -43,11 +43,30 @@ export async function GET(request: Request) {
             return NextResponse.redirect(new URL('/home?error=no_access_token', request.url))
         }
 
-        const user = await prisma.user.findUnique({
+        // Find or create user
+        let user = await prisma.user.findUnique({
             where: {
                 clerkId: userId
             }
         })
+        // If user doesn't exist, create them
+        if (!user) {
+            console.log('👤 User not found, creating new user for clerkId:', userId)
+            try {
+                user = await prisma.user.create({
+                    data: {
+                        clerkId: userId,
+                        email: '', // You can fetch this from Clerk if needed
+                        name: 'User',
+                        calendarConnected: false,
+                    }
+                })
+                console.log('✅ User created successfully:', user.id)
+            } catch (error) {
+                console.error('❌ Failed to create user:', error)
+                return NextResponse.redirect(new URL('/home?error=user_creation_failed', request.url))
+            }
+        }
 
         console.log('🔍 Database lookup result for clerkId:', userId, 'found:', !!user)
         

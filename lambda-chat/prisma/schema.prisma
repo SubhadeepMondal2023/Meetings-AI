@@ -23,34 +23,8 @@ model User {
   googleTokenExpiry  DateTime?
   calendarConnected  Boolean   @default(false)
 
-  slackUserId          String?
-  slackTeamId          String?
-  slackConnected       Boolean @default(false)
-  preferredChannelId   String?
-  preferredChannelName String?
-
-  currentPlan          String    @default("free")
-  subscriptionStatus   String    @default("inactive")
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-  billingPeriodStart   DateTime?
-  meetingsThisMonth    Int       @default(0)
-  chatMessagesToday    Int       @default(0)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model SlackInstallation {
-  id            String   @id @default(cuid())
-  teamId        String   @unique
-  teamName      String
-  botToken      String   @db.Text
-  installedBy   String
-  installerName String?
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 }
 
 model Meeting {
@@ -100,13 +74,6 @@ model UserIntegration {
   accessToken  String    @db.Text
   refreshToken String?   @db.Text
   expiresAt    DateTime?
-
-  boardId     String?
-  boardName   String?
-  projectId   String?
-  projectName String?
-  workspaceId String?
-  domain      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

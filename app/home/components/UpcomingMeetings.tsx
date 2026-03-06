@@ -92,7 +92,7 @@ export default function UpcomingMeetings() {
 
     const handleConnectCalendar = () => {
         // Ensure this path matches your auth route
-        window.location.href = '/api/auth/google' 
+        window.location.href = '/api/auth/google/direct-connect' 
     }
 
     if (loading && !isRefreshing) {

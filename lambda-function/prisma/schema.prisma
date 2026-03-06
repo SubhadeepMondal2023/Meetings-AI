@@ -52,13 +52,6 @@ model User {
   googleTokenExpiry  DateTime?
   calendarConnected  Boolean   @default(false)
 
-  slackUserId          String?
-  slackTeamId          String?
-  slackConnected       Boolean   @default(false)
-  preferredChannelId   String?
-  preferredChannelName String?
-
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -173,17 +166,6 @@ model TranscriptChunk {
   @@index([meetingId])
 }
 
-model SlackInstallation {
-  id            String   @id @default(cuid())
-  teamId        String   @unique
-  teamName      String
-  botToken      String   @db.Text
-  installedBy   String
-  installerName String?
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
 
 model UserIntegration {
   id           String    @id @default(cuid())
@@ -192,13 +174,6 @@ model UserIntegration {
   accessToken  String    @db.Text
   refreshToken String?   @db.Text
   expiresAt    DateTime?
-
-  boardId      String?
-  boardName    String?
-  projectId    String?
-  projectName  String?
-  workspaceId  String?
-  domain       String?
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

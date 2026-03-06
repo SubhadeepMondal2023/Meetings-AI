@@ -2,10 +2,6 @@ import Image from 'next/image'
 import React from 'react'
 
 const integrations = [
-    { name: "Slack", image: "slack.png" },
-    { name: "Asana", image: "asana.png" },
-    { name: "Jira", image: "jira.png" },
-    { name: "Trello", image: "trello.png" },
     { name: "Google Calendar", image: "gcal.png" }
 ]
 

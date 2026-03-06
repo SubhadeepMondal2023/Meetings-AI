@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  connectionLimit = 5
 }
 
 // ---------------------------------------------------------
@@ -51,12 +52,6 @@ model User {
   googleRefreshToken String?
   googleTokenExpiry  DateTime?
   calendarConnected  Boolean   @default(false)
-
-  slackUserId          String?
-  slackTeamId          String?
-  slackConnected       Boolean   @default(false)
-  preferredChannelId   String?
-  preferredChannelName String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -191,13 +186,6 @@ model UserIntegration {
   accessToken  String    @db.Text
   refreshToken String?   @db.Text
   expiresAt    DateTime?
-
-  boardId      String?
-  boardName    String?
-  projectId    String?
-  projectName  String?
-  workspaceId  String?
-  domain       String?
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
