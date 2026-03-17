@@ -1,6 +1,5 @@
 'use client'
-
-import { Bot, Home, Layers3, Settings} from "lucide-react";
+import { Home, Layers3, Settings, Bot, GitFork } from "lucide-react"
 import { usePathname } from "next/navigation";
 import { 
     Sidebar, 
@@ -17,6 +16,7 @@ import Link from "next/link";
 
 const items = [
     { title: "Home", url: "/home", icon: Home },
+    { title: "Graph", url: "/graph", icon: GitFork },
     { title: "Integrations", url: "/integrations", icon: Layers3 },
     { title: "Settings", url: "/settings", icon: Settings },
     { title: "Chat with AI", url: "/chat", icon: Bot },
@@ -35,7 +35,7 @@ export function AppSidebar() {
                         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white">
                             <Bot className="w-4 h-4" />
                         </div>
-                        <span className="text-sm font-semibold">MeetingBot AI</span>
+                        <span className="text-sm font-semibold">Meetings AI</span>
                     </div>
                 </div>
             </SidebarHeader>

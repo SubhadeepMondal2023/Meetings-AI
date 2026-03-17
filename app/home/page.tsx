@@ -32,11 +32,6 @@ function Home() {
 
     return (
         <div className='min-h-screen bg-background p-6'>
-            
-            {/* 1. 🕸️ KNOWLEDGE GRAPH SECTION (NEW) */}
-            <div className="mb-8">
-                <GraphVisualization />
-            </div>
 
             <div className='flex gap-6'>
                 {/* 2. Left Side: Past Meetings */}

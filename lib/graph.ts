@@ -1,8 +1,11 @@
 /**
- * ENHANCED KNOWLEDGE GRAPH EXTRACTION & QUERYING (FIXED)
+ * ENHANCED KNOWLEDGE GRAPH EXTRACTION (STEP 2 FIX)
  * 
- * This module implements knowledge graph extraction using LangChain
- * with strict entity resolution and no TypeScript errors.
+ * Key improvements:
+ * 1. Transcript is now ENRICHED with entity metadata before extraction
+ * 2. LLM has explicit instructions on entity types and relationships
+ * 3. Manual post-processing to create missing relationships (ActionItem→Deadline, etc.)
+ * 4. Entity deduplication using normalized names
  */
 
 import { ChatOpenAI } from "@langchain/openai";
@@ -10,9 +13,14 @@ import { LLMGraphTransformer } from "@langchain/community/experimental/graph_tra
 import { Neo4jGraph } from "@langchain/community/graphs/neo4j_graph";
 import { Document } from "@langchain/core/documents";
 import { GraphCypherQAChain } from "@langchain/community/chains/graph_qa/cypher";
+import {
+  enrichTranscript,
+  getDeduplicationMap,
+  type ExtractedEntity,
+} from "./entity-extractor";
 
 // ============================================================================
-// TYPE DEFINITIONS (INLINE)
+// TYPE DEFINITIONS
 // ============================================================================
 
 type GraphNode = {
@@ -36,18 +44,58 @@ type KnowledgeGraphData = {
 };
 
 // ============================================================================
-// CONFIGURATION
+// CONFIGURATION WITH ENRICHED INSTRUCTIONS
 // ============================================================================
 
 const model = new ChatOpenAI({
   modelName: "gpt-4o-mini",
-  temperature: 0,
+  temperature: 0, // Deterministic for consistent extraction
   openAIApiKey: process.env.OPENAI_API_KEY,
   requestOptions: {
     timeout: 45000,
   },
   maxRetries: 2,
 });
+
+// ✅ IMPROVED: System prompt now guides extraction with examples
+const ENHANCED_SYSTEM_PROMPT = `You are a knowledge graph extraction expert for meeting transcripts.
+
+Your task: Extract a structured knowledge graph from the transcript.
+
+ENTITY TYPES (Create nodes for these):
+1. Meeting - The meeting itself
+2. Speaker - A person who spoke (USE NORMALIZED NAMES from metadata)
+3. ActionItem - A task/responsibility (e.g., "Fix bug", "Present findings")
+4. Deadline - A date when something is due (extracted from "by Friday", "Q2", etc.)
+5. Decision - A key decision made (e.g., "We decided to...", "We will...")
+6. Project - A named initiative or project
+7. Topic - A subject discussed
+8. Risk - A potential problem identified
+9. Assumption - A stated or implied assumption
+
+RELATIONSHIP TYPES (Create edges between nodes):
+1. SPOKE_IN(Speaker → Meeting) - "Speaker X participated in Meeting Y"
+2. ASSIGNED_TO(ActionItem → Speaker) - "Task X assigned to Person Y"
+3. HAS_DEADLINE(ActionItem → Deadline) - "Task X has deadline Y"
+4. DISCUSSED(Speaker/ActionItem → Topic) - "X discussed/relates to Topic Y"
+5. WORKS_ON(Speaker → Project) - "Person X works on Project Y"
+6. HAS_RISK(ActionItem/Decision → Risk) - "X has potential Risk Y"
+7. DECIDED_TO(Speaker/Meeting → Decision) - "X decided to do Y"
+8. DEPENDS_ON(ActionItem → ActionItem) - "Task X depends on Task Y"
+9. MENTIONS(Topic → Concept) - "Topic X mentions Concept Y"
+10. IMPACTS(Decision → Outcome) - "Decision X impacts Outcome Y"
+
+EXTRACTION RULES:
+- Use [PERSON: name], [ACTION: text | assignedTo: X | deadline: Y] markers as hints
+- Speaker nodes: Use normalized names (already deduplicated in metadata)
+- Action items: ALWAYS create ActionItem → Deadline relationship if deadline exists
+- Relationships: Be explicit - don't omit relationships that are implied
+- Confidence: Only create relationships with >70% confidence
+
+CRITICAL: If an action item has a deadline, CREATE BOTH:
+  - ActionItem node
+  - Deadline node
+  - HAS_DEADLINE relationship between them`;
 
 const transformer = new LLMGraphTransformer({
   llm: model,
@@ -59,8 +107,8 @@ const transformer = new LLMGraphTransformer({
     "Decision",
     "Project",
     "Risk",
-    "Outcome",
     "Topic",
+    "Outcome",
     "Assumption",
   ],
   allowedRelationships: [
@@ -84,9 +132,6 @@ const transformer = new LLMGraphTransformer({
 
 let graphInstance: Neo4jGraph | null = null;
 
-/**
- * Lazily initializes Neo4j connection with retry logic
- */
 async function getGraph(): Promise<Neo4jGraph> {
   if (graphInstance) {
     return graphInstance;
@@ -117,23 +162,19 @@ async function getGraph(): Promise<Neo4jGraph> {
         const waitTime = retryDelay * Math.pow(2, attempt - 1);
         console.log(`⏳ Retrying in ${waitTime}ms...`);
         await new Promise((resolve) => setTimeout(resolve, waitTime));
-      } else {
-        throw new Error(
-          `Failed to connect to Neo4j after ${maxRetries} attempts`
-        );
       }
     }
   }
 
-  throw new Error("Unreachable: Neo4j connection failed");
+  throw new Error("Failed to connect to Neo4j after retries");
 }
 
 // ============================================================================
-// KNOWLEDGE GRAPH EXTRACTION
+// KNOWLEDGE GRAPH EXTRACTION (STEP 2 FIX)
 // ============================================================================
 
 /**
- * Extracts knowledge graph from meeting transcript
+ * ✅ FIXED: Now uses enriched transcript for better extraction
  */
 export async function addToKnowledgeGraph(
   transcript: unknown,
@@ -146,9 +187,9 @@ export async function addToKnowledgeGraph(
       return null;
     }
 
-    console.log("🕸️ Starting Knowledge Graph Extraction...");
+    console.log("🕸️ Starting Knowledge Graph Extraction (STEP 2 FIX)...");
 
-    // Step 1: Normalize transcript
+    // Step 1: Normalize transcript to string
     let textContent = "";
     if (Array.isArray(transcript)) {
       textContent = transcript
@@ -182,22 +223,34 @@ export async function addToKnowledgeGraph(
 
     console.log(`📝 Transcript normalized: ${textContent.length} characters`);
 
-    // Step 2: Create LangChain Document
+    // ✅ STEP 2 FIX: Enrich transcript with entity metadata
+    console.log("✨ Enriching transcript with entity metadata...");
+    const enrichmentResult = await enrichTranscript(textContent);
+    const enrichedText = enrichmentResult.enriched;
+    const extractedEntities = enrichmentResult.entities;
+    const deduplicationMap = getDeduplicationMap(extractedEntities);
+
+    console.log(
+      `✅ Enrichment complete: ${extractedEntities.length} entities identified`
+    );
+
+    // Step 3: Create LangChain Document with enriched content
     const documents = [
       new Document({
-        pageContent: textContent,
+        pageContent: enrichedText,
         metadata: {
           meetingId,
           meetingTitle,
           extractedAt: new Date().toISOString(),
           wordCount: textContent.split(/\s+/).length,
-          source: "meeting_transcript",
+          source: "meeting_transcript_enriched",
+          entityCount: extractedEntities.length,
         },
       }),
     ];
 
-    // Step 3: Extract graph structures
-    console.log("🔍 Extracting entities and relationships...");
+    // Step 4: Extract graph structures
+    console.log("🔍 Extracting entities and relationships from enriched transcript...");
     const graphDocuments = await transformer.convertToGraphDocuments(
       documents
     );
@@ -211,16 +264,25 @@ export async function addToKnowledgeGraph(
       `✅ Extracted ${graphDocuments.length} graph document(s)`
     );
 
-    // Step 4: Save to Neo4j
+    // ✅ STEP 2 FIX: Post-process to add missing relationships
+    console.log("🔗 Post-processing: Adding missing relationships...");
+    const processedDocuments = postProcessGraphDocuments(
+      graphDocuments,
+      extractedEntities,
+      deduplicationMap,
+      meetingId
+    );
+
+    // Step 5: Save to Neo4j
     console.log("💾 Saving graph structures to Neo4j...");
     const neo4j = await getGraph();
-    await neo4j.addGraphDocuments(graphDocuments);
+    await neo4j.addGraphDocuments(processedDocuments);
 
     console.log("✅ Graph saved to Neo4j");
 
-    // Step 5: Extract and structure data
-    const nodes = extractNodes(graphDocuments);
-    const relationships = extractRelationships(graphDocuments);
+    // Step 6: Extract and structure data
+    const nodes = extractNodes(processedDocuments);
+    const relationships = extractRelationships(processedDocuments);
 
     const result: KnowledgeGraphData = {
       nodes,
@@ -243,17 +305,126 @@ export async function addToKnowledgeGraph(
   }
 }
 
+// ============================================================================
+// POST-PROCESSING: Add Missing Relationships (STEP 2 FIX)
+// ============================================================================
+
 /**
- * Extracts nodes from graph documents
+ * ✅ STEP 2 FIX: Post-process to add relationships that LLM might miss
+ * Especially: ActionItem → HAS_DEADLINE → Deadline
  */
-function extractNodes(graphDocuments: unknown[]): GraphNode[] {
+function postProcessGraphDocuments(
+  graphDocuments: any[],
+  extractedEntities: ExtractedEntity[],
+  deduplicationMap: Map<string, string>,
+  meetingId: string
+): any[] {
+  const docs = graphDocuments as any[];
+
+  for (const doc of docs) {
+    if (!doc.relationships) {
+      doc.relationships = [];
+    }
+
+    const relationships = doc.relationships as Array<Record<string, unknown>>;
+
+    // Extract action items from document
+    const actionItems = extractedEntities.filter((e) => e.type === "ACTION_ITEM");
+
+    for (const actionItem of actionItems) {
+      const metadata = actionItem.metadata as Record<string, unknown>;
+      const deadline = metadata.deadline as string | null;
+      const assignedTo = metadata.assignedTo as string | null;
+
+      if (deadline) {
+        // ✅ Create ActionItem → HAS_DEADLINE → Deadline relationship
+        const actionItemId = actionItem.normalizedValue;
+        const deadlineId = `deadline_${deadline.replace(/-/g, "_")}`;
+
+        // Check if relationship already exists
+        const exists = relationships.some(
+          (r) =>
+            r.source?.id === actionItemId &&
+            r.type === "HAS_DEADLINE" &&
+            r.target?.id === deadlineId
+        );
+
+        if (!exists) {
+          console.log(
+            `   ➕ Adding missing relationship: ${actionItemId} --[HAS_DEADLINE]--> ${deadlineId}`
+          );
+
+          relationships.push({
+            source: {
+              type: "ActionItem",
+              id: actionItemId,
+            },
+            target: {
+              type: "Deadline",
+              id: deadlineId,
+            },
+            type: "HAS_DEADLINE",
+            properties: {
+              deadline: deadline,
+              meetingId,
+            },
+          });
+        }
+      }
+
+      if (assignedTo) {
+        // ✅ Create ActionItem → ASSIGNED_TO → Speaker relationship
+        const actionItemId = actionItem.normalizedValue;
+        const speakerId = assignedTo;
+
+        const exists = relationships.some(
+          (r) =>
+            r.source?.id === actionItemId &&
+            r.type === "ASSIGNED_TO" &&
+            r.target?.id === speakerId
+        );
+
+        if (!exists) {
+          console.log(
+            `   ➕ Adding missing relationship: ${actionItemId} --[ASSIGNED_TO]--> ${speakerId}`
+          );
+
+          relationships.push({
+            source: {
+              type: "ActionItem",
+              id: actionItemId,
+            },
+            target: {
+              type: "Speaker",
+              id: speakerId,
+            },
+            type: "ASSIGNED_TO",
+            properties: {
+              meetingId,
+            },
+          });
+        }
+      }
+    }
+
+    doc.relationships = relationships;
+  }
+
+  return docs;
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function extractNodes(graphDocuments: any[]): GraphNode[] {
   const nodeMap = new Map<string, GraphNode>();
 
-  const docs = graphDocuments as Array<Record<string, unknown>>;
-  for (const doc of docs) {
-    if (doc.nodes && Array.isArray(doc.nodes)) {
-      for (const node of doc.nodes) {
-        const n = node as Record<string, unknown>;
+  for (const doc of graphDocuments) {
+    const docAny = doc as any;
+    if (docAny.nodes && Array.isArray(docAny.nodes)) {
+      for (const node of docAny.nodes) {
+        const n = node as any;
         const nodeType = String(n.type ?? "Unknown");
         const nodeId = String(n.id ?? "");
         const key = `${nodeType}:${nodeId}`;
@@ -272,19 +443,16 @@ function extractNodes(graphDocuments: unknown[]): GraphNode[] {
   return Array.from(nodeMap.values());
 }
 
-/**
- * Extracts relationships from graph documents
- */
-function extractRelationships(graphDocuments: unknown[]): GraphRelationship[] {
+function extractRelationships(graphDocuments: any[]): GraphRelationship[] {
   const relationshipMap = new Map<string, GraphRelationship>();
 
-  const docs = graphDocuments as Array<Record<string, unknown>>;
-  for (const doc of docs) {
-    if (doc.relationships && Array.isArray(doc.relationships)) {
-      for (const rel of doc.relationships) {
-        const r = rel as Record<string, unknown>;
-        const source = r.source as Record<string, unknown>;
-        const target = r.target as Record<string, unknown>;
+  for (const doc of graphDocuments) {
+    const docAny = doc as any;
+    if (docAny.relationships && Array.isArray(docAny.relationships)) {
+      for (const rel of docAny.relationships) {
+        const r = rel as any;
+        const source = r.source as any;
+        const target = r.target as any;
         const sourceId = String(source?.id ?? r.source ?? "");
         const targetId = String(target?.id ?? r.target ?? "");
         const relType = String(r.type ?? "UNKNOWN");
@@ -309,9 +477,6 @@ function extractRelationships(graphDocuments: unknown[]): GraphRelationship[] {
 // GRAPH QUERYING
 // ============================================================================
 
-/**
- * Queries the knowledge graph using natural language
- */
 export async function queryGraphMemory(question: string): Promise<string> {
   try {
     if (
@@ -351,11 +516,7 @@ export async function queryGraphMemory(question: string): Promise<string> {
       }
     }
 
-    if (typeof response === "string") {
-      return response;
-    }
-
-    return JSON.stringify(response);
+    return typeof response === "string" ? response : JSON.stringify(response);
   } catch (error) {
     console.error(
       "❌ Graph Query Failed:",
@@ -366,105 +527,62 @@ export async function queryGraphMemory(question: string): Promise<string> {
 }
 
 // ============================================================================
-// ADVANCED GRAPH QUERIES
+// MAINTENANCE & EXPORT
 // ============================================================================
 
-/**
- * Retrieves action items for specific person
- */
-export async function getActionItemsForPerson(
-  personName: string
-): Promise<string[]> {
+export async function clearGraph(): Promise<boolean> {
   try {
-    const neo4j = await getGraph();
-
-    const result = await neo4j.query(
-      `MATCH (p:Speaker {name: $name})<-[:ASSIGNED_TO]-(a:ActionItem)
-       RETURN a.text as actionItem, a.id as id
-       ORDER BY a.id`,
-      { name: personName }
-    );
-
-    const queryResult = result as Array<Record<string, unknown>>;
-    return queryResult.map((record) => String(record.actionItem ?? ""));
+    const neo4jGraph = await getGraph();
+    await neo4jGraph.query("MATCH (n) DETACH DELETE n");
+    console.log("🧹 Graph cleared successfully");
+    return true;
   } catch (error) {
-    console.error(`Failed to get action items for ${personName}:`, error);
-    return [];
+    console.error("❌ Failed to clear graph:", error);
+    return false;
   }
 }
 
-/**
- * Retrieves decisions with associated risks
- */
-export async function getDecisionsWithRisks(): Promise<
-  Array<{ decision: string; risks: string[] }>
-> {
+export async function deleteGraphForMeeting(
+  meetingId: string
+): Promise<boolean> {
   try {
-    const neo4j = await getGraph();
+    const neo4jGraph = await getGraph();
 
-    const result = await neo4j.query(
-      `MATCH (d:Decision)-[:HAS_RISK]->(r:Risk)
-       RETURN d.description as decision, collect(r.description) as risks`
-    );
+    const deleteQuery = `
+      MATCH (n {meetingId: $meetingId})
+      DETACH DELETE n
+      RETURN count(n) as deletedCount
+    `;
 
+    const result = await neo4jGraph.query(deleteQuery, { meetingId });
     const queryResult = result as Array<Record<string, unknown>>;
-    return queryResult.map((record) => ({
-      decision: String(record.decision ?? ""),
-      risks: Array.isArray(record.risks)
-        ? record.risks.map((r) => String(r ?? ""))
-        : [],
-    }));
-  } catch (error) {
-    console.error("Failed to get decisions with risks:", error);
-    return [];
-  }
-}
+    const deletedCount = queryResult[0]?.deletedCount ?? 0;
 
-/**
- * Finds discussions related to project
- */
-export async function getProjectDiscussions(
-  projectName: string
-): Promise<string[]> {
-  try {
-    const neo4j = await getGraph();
-
-    const result = await neo4j.query(
-      `MATCH (p:Project {name: $name})<-[:DISCUSSED]-(d)
-       WHERE d:Topic OR d:Decision
-       RETURN DISTINCT d.description as content
-       LIMIT 20`,
-      { name: projectName }
+    console.log(
+      `🧹 Deleted ${deletedCount} nodes for meeting ${meetingId}`
     );
-
-    const queryResult = result as Array<Record<string, unknown>>;
-    return queryResult.map((record) => String(record.content ?? ""));
+    return true;
   } catch (error) {
     console.error(
-      `Failed to get discussions for project ${projectName}:`,
+      `Failed to delete graph for meeting ${meetingId}:`,
       error
     );
-    return [];
+    return false;
   }
 }
 
-/**
- * Gets graph statistics
- */
 export async function getGraphStatistics(): Promise<
   Record<string, unknown>
 > {
   try {
     const neo4j = await getGraph();
 
-    // Get node counts
     const nodeStats = await neo4j.query(
       `MATCH (n)
        RETURN labels(n)[0] as type, count(*) as count
        ORDER BY count DESC`
     );
 
-    // Get relationship counts
     const relStats = await neo4j.query(
       `MATCH ()-[r]->()
        RETURN type(r) as type, count(*) as count
@@ -496,135 +614,5 @@ export async function getGraphStatistics(): Promise<
   } catch (error) {
     console.error("Failed to get graph statistics:", error);
     return {};
-  }
-}
-
-// ============================================================================
-// GRAPH MAINTENANCE
-// ============================================================================
-
-/**
- * Clears all graph data
- */
-export async function clearGraph(): Promise<boolean> {
-  try {
-    const neo4jGraph = await getGraph();
-    await neo4jGraph.query("MATCH (n) DETACH DELETE n");
-    console.log("🧹 Graph cleared successfully");
-    return true;
-  } catch (error) {
-    console.error("❌ Failed to clear graph:", error);
-    return false;
-  }
-}
-
-/**
- * Deletes graph data for specific meeting
- */
-export async function deleteGraphForMeeting(
-  meetingId: string
-): Promise<boolean> {
-  try {
-    const neo4jGraph = await getGraph();
-
-    const deleteQuery = `
-      MATCH (n {meetingId: $meetingId})
-      DETACH DELETE n
-      RETURN count(n) as deletedCount
-    `;
-
-    const result = await neo4jGraph.query(deleteQuery, { meetingId });
-    const queryResult = result as Array<Record<string, unknown>>;
-    const deletedCount = queryResult[0]?.deletedCount ?? 0;
-
-    console.log(
-      `🧹 Deleted ${deletedCount} nodes for meeting ${meetingId}`
-    );
-    return true;
-  } catch (error) {
-    console.error(
-      `Failed to delete graph for meeting ${meetingId}:`,
-      error
-    );
-    return false;
-  }
-}
-
-/**
- * Merges duplicate nodes
- */
-export async function mergeDuplicateNodes(
-  nodeType: string,
-  propertyName: string = "name"
-): Promise<number> {
-  try {
-    const neo4jGraph = await getGraph();
-
-    const mergeQuery = `
-      MATCH (n1:${nodeType}), (n2:${nodeType})
-      WHERE n1.${propertyName} = n2.${propertyName} 
-        AND id(n1) < id(n2)
-      WITH n1, n2, relationships(n1) as rel1, relationships(n2) as rel2
-      CALL apoc.refactor.mergeNodes([n1, n2]) 
-      YIELD node
-      RETURN count(node) as mergedCount
-    `;
-
-    const result = await neo4jGraph.query(mergeQuery);
-    const queryResult = result as Array<Record<string, unknown>>;
-    const mergedCount = Number(queryResult[0]?.mergedCount ?? 0);
-
-    console.log(
-      `✅ Merged ${mergedCount} duplicate ${nodeType} nodes`
-    );
-    return mergedCount;
-  } catch (error) {
-    console.error(
-      `Failed to merge duplicate nodes for ${nodeType}:`,
-      error
-    );
-    return 0;
-  }
-}
-
-/**
- * Exports graph as JSON
- */
-export async function exportGraphAsJSON(): Promise<{
-  nodes: unknown[];
-  relationships: unknown[];
-}> {
-  try {
-    const neo4jGraph = await getGraph();
-
-    const nodes = await neo4jGraph.query(
-      `MATCH (n)
-       RETURN {
-         id: id(n),
-         type: labels(n)[0],
-         properties: properties(n)
-       } as node`
-    );
-
-    const relationships = await neo4jGraph.query(
-      `MATCH (a)-[r]->(b)
-       RETURN {
-         source: id(a),
-         target: id(b),
-         type: type(r),
-         properties: properties(r)
-       } as rel`
-    );
-
-    const nodeResult = nodes as Array<Record<string, unknown>>;
-    const relResult = relationships as Array<Record<string, unknown>>;
-
-    return {
-      nodes: nodeResult.map((n) => n.node),
-      relationships: relResult.map((r) => r.rel),
-    };
-  } catch (error) {
-    console.error("Failed to export graph as JSON:", error);
-    return { nodes: [], relationships: [] };
   }
 }

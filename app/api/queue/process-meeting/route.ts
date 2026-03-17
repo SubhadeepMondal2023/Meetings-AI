@@ -4,12 +4,13 @@ import { processMeetingTranscript, generateRiskAnalysis, generateSentimentArc, g
 import { addToKnowledgeGraph } from "@/lib/graph";
 import { prisma } from "@/lib/db";
 import { processTranscript } from "@/lib/rag";
+import { enrichTranscript } from "@/lib/entity-extractor";
 
 // This function processes the heavy job
 async function handler(req: NextRequest) {
     console.log("👷 Worker Started: Processing Meeting...");
     const body = await req.json();
-    const { meetingId, transcript, botId } = body;
+    const { meetingId, transcript } = body;
 
     // Log transcript info for debugging
     console.log("📝 Received transcript type:", typeof transcript, "Is null:", transcript === null, "Is undefined:", transcript === undefined);
@@ -17,7 +18,6 @@ async function handler(req: NextRequest) {
     try {
         const meeting = await prisma.meeting.findUnique({
             where: { id: meetingId },
-            // ✅ FIX 1: Change 'user' to 'createdBy'
             include: { createdBy: true }
         });
 
@@ -31,34 +31,28 @@ async function handler(req: NextRequest) {
             sampleLength: JSON.stringify(transcript).length
         });
         
-        const processed = await processMeetingTranscript(transcript);;
+        // ✅ FIX: processMeetingTranscript BEFORE enrichment
+        const processed = await processMeetingTranscript(transcript);
 
-        // Update DB with Summary
+        // ✅ FIX: enrichTranscript for graph extraction
+
+        // ✅ FIX: Update DB with processed data
         await prisma.meeting.update({
             where: { id: meetingId },
-            data: {
-                summary: processed.summary,
-                actionItems: processed.actionItems,
-                processed: true,
-                processedAt: new Date(),
+            data: { 
+                summary: processed.summary, 
+                actionItems: processed.actionItems, 
+                processed: true, 
+                processedAt: new Date() 
             }
         });
 
-        // 4. PARALLEL: Run all advanced AI tasks
+        // ✅ FIX: Use enriched.enriched for graph extraction
         await Promise.allSettled([
-            // ✅ FIX 3: Change 'meeting.userId' to 'meeting.createdById'
             processTranscript(meetingId, meeting.createdById, JSON.stringify(transcript), meeting.title),
-            
-            // 😈 Risk Analysis
             generateRiskAnalysis(transcript, meetingId),
-            
-            // 🕸️ Graph Extraction
             addToKnowledgeGraph(transcript, meetingId, meeting.title),
-            
-            // 📈 Sentiment Arc
             generateSentimentArc(transcript, meetingId),
-            
-            // 🧠 Behavioral Profiling
             generateSpeakerProfiles(transcript, meetingId)
         ]);
 

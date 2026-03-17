@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React from 'react'
 import { useMeetingDetail } from './hooks/useMeetingDetail'
 import MeetingHeader from './components/MeetingHeader'
 import MeetingInfo from './components/MeetingInfo'
@@ -10,20 +10,20 @@ import TranscriptDisplay from './components/TranscriptDisplay'
 import ChatSidebar from './components/ChatSidebar'
 import CustomAudioPlayer from './components/AudioPlayer'
 import { AlertTriangle } from 'lucide-react'
-import { 
-    AreaChart, 
-    Area, 
-    XAxis, 
-    YAxis, 
-    CartesianGrid, 
-    Tooltip, 
-    ResponsiveContainer, 
-    ReferenceLine,
-    Legend 
-} from 'recharts'
+// import { 
+//     AreaChart, 
+//     Area, 
+//     XAxis, 
+//     YAxis, 
+//     CartesianGrid, 
+//     Tooltip, 
+//     ResponsiveContainer, 
+//     ReferenceLine,
+//     Legend 
+// } from 'recharts'
 
-// Distinct colors for different speakers
-const SPEAKER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+// // Distinct colors for different speakers
+// const SPEAKER_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 function MeetingDetail() {
 
@@ -51,13 +51,13 @@ function MeetingDetail() {
     // 🧠 DYNAMIC SPEAKER EXTRACTION
     // This logic finds all unique keys (speakers) in your sentiment data
     // excluding 'timestamp' and 'name'.
-    const sentimentSpeakers = useMemo(() => {
-        if (!meetingData?.sentimentData || !Array.isArray(meetingData.sentimentData) || meetingData.sentimentData.length === 0) {
-            return [];
-        }
-        const firstPoint = meetingData.sentimentData[0];
-        return Object.keys(firstPoint).filter(key => key !== 'timestamp' && key !== 'name');
-    }, [meetingData]);
+    // const sentimentSpeakers = useMemo(() => {
+    //     if (!meetingData?.sentimentData || !Array.isArray(meetingData.sentimentData) || meetingData.sentimentData.length === 0) {
+    //         return [];
+    //     }
+    //     const firstPoint = meetingData.sentimentData[0];
+    //     return Object.keys(firstPoint).filter(key => key !== 'timestamp' && key !== 'name');
+    // }, [meetingData]);
 
     return (
         <div className='min-h-screen bg-background'>
@@ -152,7 +152,7 @@ function MeetingDetail() {
                                             )}
 
                                             {/* 3.  Advanced Sentiment Arc (Multi-Speaker) */}
-                                            {(meetingData as any).sentimentData && (meetingData as any).sentimentData.length > 0 && (
+                                            {/* {(meetingData as any).sentimentData && (meetingData as any).sentimentData.length > 0 && (
                                                 <div className="bg-card border border-border rounded-lg p-6">
                                                     <div className="flex items-center gap-2 mb-6">
                                                         <span className="text-2xl">❤️</span>
@@ -193,7 +193,7 @@ function MeetingDetail() {
                                                                 <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
 
                                                                 {/* 🎨 DYNAMICALLY RENDER LINES PER SPEAKER */}
-                                                                {sentimentSpeakers.map((speaker, index) => (
+                                                                {/* {sentimentSpeakers.map((speaker, index) => (
                                                                     <Area 
                                                                         key={speaker}
                                                                         type="monotone" 
@@ -210,7 +210,7 @@ function MeetingDetail() {
                                                         </ResponsiveContainer>
                                                     </div>
                                                 </div>
-                                            )}
+                                            )} */} 
 
                                             {!userChecked ? (
                                                 <div className='bg-card border border-border rounded-lg p-6'>

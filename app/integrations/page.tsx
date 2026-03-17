@@ -38,11 +38,6 @@ function Integrations() {
             <div className='max-w-4xl mx-auto'>
                 <div className='mb-8'>
                     <h1 className='text-2xl font-bold text-foreground mb-2'>Integrations</h1>
-
-                    <p className='text-muted-foreground'>
-                        Connect your favourite tools to automatically add action items from meetings
-
-                    </p>
                 </div>
 
                 {setupMode && (
@@ -82,19 +77,6 @@ function Integrations() {
                             }}
                         />
                     ))}
-                </div>
-
-                <div className='mt-8 bg-card rounded-lg p-6 border border-border'>
-                    <h3 className='font-semibold text-foreground mb-2'>How it works </h3>
-
-                    <ol className='text-sm text-muted-foreground space-y-2'>
-                        <li>1. Connect your preffered tools above</li>
-                        <li>2. Choose where to send action items during setup</li>
-                        <li>3. In meetings, hover over action items and click "Add to"</li>
-                        <li>4. Select which tool(s) to add the task to from the dropdown</li>
-
-                    </ol>
-
                 </div>
 
             </div>
