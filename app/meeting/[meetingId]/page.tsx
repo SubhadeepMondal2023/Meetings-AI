@@ -241,7 +241,7 @@ function MeetingDetail() {
                                                             <div className='space-y-3'>
                                                                 {displayActionItems.map((item) => (
                                                                     <div key={item.id} className='flex items-start gap-3'>
-                                                                        <div className='w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0'></div>
+                                                                        <div className='w-2 h-2 rounded-full bg-primary mt-2 shrink-0'></div>
                                                                         <p className='text-sm text-foreground'>{item.text}</p>
                                                                     </div>
                                                                 ))}

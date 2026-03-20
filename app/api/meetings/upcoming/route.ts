@@ -2,7 +2,9 @@ import { auth, clerkClient } from "@clerk/nextjs/server"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
 import { google } from "googleapis"
+import { Client } from "@upstash/qstash"
 
+const qstashClient = new Client({ token: process.env.QSTASH_TOKEN! })
 export async function GET() {
     try {
         const { userId } = await auth()
@@ -54,7 +56,7 @@ export async function GET() {
                             event.description?.match(/https?:\/\/[^\s]+/)?.[0] || 
                             ""
 
-                        await prisma.meeting.upsert({
+                       const upsertedMeeting =  await prisma.meeting.upsert({
                             where: { calendarEventId: event.id! },
                             update: {
                                 title: event.summary || "Untitled Meeting",
@@ -75,6 +77,24 @@ export async function GET() {
                                 botScheduled: true 
                             }
                         })
+                        // ✅ Schedule bot to join at meeting start time (only for new meetings)
+                        if (upsertedMeeting.botScheduled && !upsertedMeeting.botSent) {
+                            const startTimestamp = Math.floor(new Date(event.start.dateTime).getTime() / 1000)
+                            const now = Math.floor(Date.now() / 1000)
+                            
+                            if (startTimestamp > now) {
+                                try {
+                                    await qstashClient.publishJSON({
+                                        url: `${process.env.NEXT_PUBLIC_APP_URI}/api/meetings/${upsertedMeeting.id}/bot-toggle`,
+                                        body: { botScheduled: true },
+                                        notBefore: startTimestamp
+                                    })
+                                    console.log(`📅 Bot scheduled for meeting: ${upsertedMeeting.title} at ${event.start.dateTime}`)
+                                } catch (err) {
+                                    console.error("❌ Failed to schedule bot:", err)
+                                }
+                            }
+                        }
                     }
                 }
                 

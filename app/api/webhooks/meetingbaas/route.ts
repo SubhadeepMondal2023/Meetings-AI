@@ -161,16 +161,34 @@ function mergeTranscriptWithSpeakers(originalSegments: any[], transcribedSegment
   if (!fullText) return originalSegments
 
   const words = fullText.split(/\s+/).filter((w: string) => w.length > 0)
+  
+  // Filter out zero-duration segments and segments with no meaningful duration
+  const validSegments = originalSegments.filter((seg: any) => {
+    const startTime = seg.start_time || seg.offset || 0
+    const endTime = seg.end_time || startTime + 1
+    return (endTime - startTime) > 0.1 // skip segments shorter than 100ms
+  })
+
+  // Calculate total duration for proportional word distribution
+  const totalDuration = validSegments.reduce((sum: number, seg: any) => {
+    const startTime = seg.start_time || seg.offset || 0
+    const endTime = seg.end_time || startTime + 1
+    return sum + (endTime - startTime)
+  }, 0)
+
   let wordIndex = 0
   const merged: any[] = []
 
-  for (const originalSeg of originalSegments) {
+  for (const originalSeg of validSegments) {
     const speaker = originalSeg.speaker || "Unknown"
     const offset = originalSeg.offset || originalSeg.start_time || 0
     const startTime = originalSeg.start_time || offset
     const endTime = originalSeg.end_time || startTime + 1
     const duration = endTime - startTime
-    const estimatedWords = Math.max(1, Math.round(duration * 2))
+
+    // Proportional word count based on duration
+    const proportion = duration / totalDuration
+    const estimatedWords = Math.max(1, Math.round(proportion * words.length))
     const segmentTextWords = words.slice(wordIndex, wordIndex + estimatedWords)
     const segmentWords: any[] = []
 
@@ -187,6 +205,20 @@ function mergeTranscriptWithSpeakers(originalSegments: any[], transcribedSegment
     merged.push({ speaker, offset, start_time: startTime, end_time: endTime, words: segmentWords })
   }
 
-  console.log(`✅ Merged ${merged.length} segments`)
+  // If any words remain unassigned, add them to the last segment
+  if (wordIndex < words.length && merged.length > 0) {
+    const remaining = words.slice(wordIndex)
+    const lastSeg = merged[merged.length - 1]
+    const lastWordEnd = lastSeg.words?.[lastSeg.words.length - 1]?.end || lastSeg.end_time
+    remaining.forEach((word, i) => {
+      lastSeg.words.push({
+        word,
+        start: lastWordEnd + i * 0.3,
+        end: lastWordEnd + (i + 1) * 0.3
+      })
+    })
+  }
+
+  console.log(`✅ Merged ${merged.length} segments (filtered from ${originalSegments.length})`)
   return merged
 }
