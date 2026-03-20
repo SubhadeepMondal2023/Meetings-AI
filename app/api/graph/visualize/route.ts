@@ -149,11 +149,9 @@ export async function GET(req: NextRequest) {
 
         // All nodes store their value under the "id" property (confirmed from schema)
         const rawName =
-          props.id          ??  // primary — every node type uses this
-          props.name        ??  // fallbacks for any future node types
-          props.text        ??
-          props.title       ??
-          `[${type}]`;
+          type === "Meeting"
+            ? (props.title ?? props.meetingTitle ?? props.id ?? `[${type}]`)  // ← show title for Meeting
+            : (props.id ?? props.name ?? props.text ?? props.title ?? `[${type}]`)
 
         return {
           id,

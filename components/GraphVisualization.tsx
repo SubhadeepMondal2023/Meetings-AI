@@ -248,7 +248,7 @@ export default function GraphVisualization() {
               {/* Property row — key + full value, wraps naturally */}
               <div className="px-4 py-3 flex flex-col gap-0.5">
                 <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide leading-none">
-                  id
+                  {hoveredNode.type === "Meeting" ? "title" : "id"}
                 </span>
                 <span className="text-sm text-slate-100 font-medium leading-snug break-words">
                   {hoveredNode.label}

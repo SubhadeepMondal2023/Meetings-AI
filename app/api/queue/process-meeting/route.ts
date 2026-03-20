@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySignatureAppRouter } from "@upstash/qstash/dist/nextjs";
-import { processMeetingTranscript, generateRiskAnalysis, generateSentimentArc, generateSpeakerProfiles } from "@/lib/ai-processor";
+import { processMeetingTranscript } from "@/lib/ai-processor";
 import { addToKnowledgeGraph } from "@/lib/graph";
 import { prisma } from "@/lib/db";
 import { processTranscript } from "@/lib/rag";
-import { enrichTranscript } from "@/lib/entity-extractor";
 
-// This function processes the heavy job
 async function handler(req: NextRequest) {
     console.log("👷 Worker Started: Processing Meeting...");
     const body = await req.json();
     const { meetingId, transcript } = body;
 
-    // Log transcript info for debugging
     console.log("📝 Received transcript type:", typeof transcript, "Is null:", transcript === null, "Is undefined:", transcript === undefined);
 
     try {
@@ -23,20 +20,8 @@ async function handler(req: NextRequest) {
 
         if (!meeting) return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
 
-        // 1. Generate Summary & Action Items
-        console.log("📋 Transcript structure:", {
-            type: typeof transcript,
-            isArray: Array.isArray(transcript),
-            firstItem: Array.isArray(transcript) ? transcript[0] : null,
-            sampleLength: JSON.stringify(transcript).length
-        });
-        
-        // ✅ FIX: processMeetingTranscript BEFORE enrichment
         const processed = await processMeetingTranscript(transcript);
 
-        // ✅ FIX: enrichTranscript for graph extraction
-
-        // ✅ FIX: Update DB with processed data
         await prisma.meeting.update({
             where: { id: meetingId },
             data: { 
@@ -47,14 +32,19 @@ async function handler(req: NextRequest) {
             }
         });
 
-        // ✅ FIX: Use enriched.enriched for graph extraction
-        await Promise.allSettled([
-            processTranscript(meetingId, meeting.createdById, JSON.stringify(transcript), meeting.title),
-            generateRiskAnalysis(transcript, meetingId),
-            addToKnowledgeGraph(transcript, meetingId, meeting.title),
-            generateSentimentArc(transcript, meetingId),
-            generateSpeakerProfiles(transcript, meetingId)
-        ]);
+        const transcriptText = Array.isArray(transcript)
+            ? transcript.map((seg: any) => {
+                const text = seg.words?.map((w: any) => w.word).join(" ") || seg.text || ""
+                return `${seg.speaker || "Speaker"}: ${text}`
+            }).join("\n")
+            : String(transcript)
+
+        // Run sequentially to avoid connection pool exhaustion
+        await processTranscript(meetingId, meeting.createdById, transcriptText, meeting.title)
+            .catch(e => console.error("❌ processTranscript failed:", e))
+
+        await addToKnowledgeGraph(transcript, meetingId, meeting.title)
+            .catch(e => console.error("❌ addToKnowledgeGraph failed:", e))
 
         console.log(`✅ Worker Finished: Meeting ${meetingId} fully processed.`);
         return NextResponse.json({ success: true });
@@ -65,5 +55,4 @@ async function handler(req: NextRequest) {
     }
 }
 
-// Security: Verify that the request actually came from QStash
 export const POST = verifySignatureAppRouter(handler);

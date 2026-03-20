@@ -130,7 +130,7 @@ function MeetingDetail() {
                                             )}
 
                                             {/* 2. Risk Analysis */}
-                                            {(meetingData as any).riskAnalysis && (
+                                            {/* {(meetingData as any).riskAnalysis && (
                                                 <div className="border-l-4 border-red-500 bg-red-50 dark:bg-red-950/10 p-6 rounded-r-lg shadow-sm">
                                                     <div className="flex items-center gap-2 mb-4">
                                                         <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
@@ -149,7 +149,7 @@ function MeetingDetail() {
                                                         * AI-generated risk assessment based on critical transcript analysis.
                                                     </div>
                                                 </div>
-                                            )}
+                                            )} */}
 
                                             {/* 3.  Advanced Sentiment Arc (Multi-Speaker) */}
                                             {/* {(meetingData as any).sentimentData && (meetingData as any).sentimentData.length > 0 && (
